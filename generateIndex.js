@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const baseUrl = "https://image-cdn.kafuchino.top";
+const baseUrl = "https://photo.api.kafuchino.top";
 const outputFile = "index.html";
 const rootDir = process.cwd();
 const ignoreList = [".git", ".edgeone", "node_modules", "generateIndex.js", "package.json", "package-lock.json", "index.html"];
