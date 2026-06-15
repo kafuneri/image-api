@@ -64,6 +64,15 @@
                     "value": "max-age=31536000"
                 }
             ]
+        },
+        {
+            "source": "/pixiv/*",
+            "headers": [
+                {
+                    "key": "Cache-Control",
+                    "value": "max-age=31536000"
+                }
+            ]
         }
     ],
     "caches": [
@@ -81,6 +90,10 @@
         },
         {
             "source": "/PC/*",
+            "cacheTtl": 8640000
+        },
+        {
+            "source": "/pixiv/*",
             "cacheTtl": 8640000
         }
     ]
