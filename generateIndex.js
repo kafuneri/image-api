@@ -1,7 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-// 图床域名配置
-const baseUrl = "https://photo.api.kafuchino.top";
+
 const rootDir = process.cwd();
 const distDir = path.join(rootDir, "dist");
 const outputFile = path.join(distDir, "index.html");
@@ -63,7 +62,7 @@ function processDirectory(currentDir, targetDir) {
       if (isImage(relativePath) || isVideo(relativePath)) {
         virtualFileSystem.push({
           path: relativePath,
-          url: `${baseUrl}/${relativePath}`,
+          url: `/${relativePath}`, // 直接使用根相对路径
           type: isImage(relativePath) ? 'image' : 'video',
           filename: file
         });
@@ -254,7 +253,10 @@ const html = `<!DOCTYPE html>
       // 匹配复制按钮
       if (e.target.classList.contains('copy-btn')) {
         const btn = e.target;
-        navigator.clipboard.writeText(btn.dataset.url).then(() => {
+        //  运行时动态获取当前域名并拼接绝对路径
+        const absoluteUrl = window.location.origin + btn.dataset.url; 
+        
+        navigator.clipboard.writeText(absoluteUrl).then(() => {
           const originalText = btn.textContent;
           btn.textContent = "✅ 已复制";
           btn.disabled = true;
