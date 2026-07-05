@@ -1,44 +1,81 @@
 const fs = require("fs");
 const path = require("path");
-
+// 图床域名配置
 const baseUrl = "https://photo.api.kafuchino.top";
-const outputFile = "index.html";
 const rootDir = process.cwd();
-const ignoreList = [".git", ".edgeone", "node_modules", "generateIndex.js", "package.json", "package-lock.json", "index.html"];
+const distDir = path.join(rootDir, "dist");
+const outputFile = path.join(distDir, "index.html");
+
+// 黑名单配置：
+const ignoreList = [
+  ".git", 
+  ".edgeone", 
+  "node_modules", 
+  "generateIndex.js", 
+  "package.json", 
+  "package-lock.json", 
+  "index.html",
+  ".gitignore",
+  "edgeone.json",
+  "dist"
+];
 
 const isImage = (filename) => /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(filename);
 const isVideo = (filename) => /\.(mp4|webm|mov)$/i.test(filename);
 
-// 提取数据数组存放容器
 let virtualFileSystem = [];
 
-function walk(dir) {
-  const files = fs.readdirSync(dir);
+// 1. 初始化构建目录 (每次构建前清空旧的 dist 目录)
+if (fs.existsSync(distDir)) {
+  fs.rmSync(distDir, { recursive: true, force: true });
+}
+fs.mkdirSync(distDir, { recursive: true });
+
+// 2. 递归白名单文件并拷贝至 dist 目录
+function processDirectory(currentDir, targetDir) {
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
+
+  const files = fs.readdirSync(currentDir);
   files.forEach((file) => {
-    const filepath = path.join(dir, file);
-    const relativePath = path.relative(rootDir, filepath).replace(/\\/g, "/");
+    // 仅在根目录级别拦截黑名单文件
+    if (currentDir === rootDir && ignoreList.includes(file)) {
+      return;
+    }
 
-    if (ignoreList.some(ignored => relativePath.startsWith(ignored))) return;
+    const srcPath = path.join(currentDir, file);
+    const destPath = path.join(targetDir, file);
+    const stat = fs.statSync(srcPath);
 
-    const stat = fs.statSync(filepath);
+    // 获取相对路径用于生成 URL 数据
+    const relativePath = path.relative(rootDir, srcPath).replace(/\\/g, "/");
+
     if (stat.isDirectory()) {
-      walk(filepath);
-    } else if (isImage(relativePath) || isVideo(relativePath)) {
-      virtualFileSystem.push({
-        path: relativePath,
-        url: `${baseUrl}/${relativePath}`,
-        type: isImage(relativePath) ? 'image' : 'video',
-        filename: file
-      });
+      // 递归处理子文件夹
+      processDirectory(srcPath, destPath);
+    } else {
+      // 物理拷贝非黑名单文件至 dist
+      fs.copyFileSync(srcPath, destPath);
+
+      // 提取媒体文件数据
+      if (isImage(relativePath) || isVideo(relativePath)) {
+        virtualFileSystem.push({
+          path: relativePath,
+          url: `${baseUrl}/${relativePath}`,
+          type: isImage(relativePath) ? 'image' : 'video',
+          filename: file
+        });
+      }
     }
   });
 }
 
-// 1. 构建虚拟文件系统数据
-walk(rootDir);
+// 执行目录拷贝与数据提取
+processDirectory(rootDir, distDir);
 const fileDataJson = JSON.stringify(virtualFileSystem);
 
-// 2. 生成包含前端路由的 SPA 页面
+// 3. 生成包含前端路由的 SPA 页面
 const html = `<!DOCTYPE html>
 <html lang="zh">
 <head>
@@ -133,7 +170,6 @@ const html = `<!DOCTYPE html>
   </div>
 
   <script>
-    // 注入后端生成的数据集
     const fileData = ${fileDataJson};
     
     const gallery = document.getElementById('gallery');
@@ -141,11 +177,9 @@ const html = `<!DOCTYPE html>
     const modal = document.getElementById('modal');
     const modalImg = document.getElementById('modal-img');
 
-    // 核心渲染函数：根据 Hash 路径生成 DOM
     function renderView(currentPath) {
       gallery.innerHTML = '';
       
-      // 1. 渲染面包屑导航
       const pathParts = currentPath.split('/').filter(Boolean);
       let breadcrumbHtml = '<a href="#/">🏠 根目录</a>';
       let cumulativePath = '';
@@ -155,26 +189,23 @@ const html = `<!DOCTYPE html>
       });
       breadcrumb.innerHTML = breadcrumbHtml;
 
-      // 2. 解析当前层级下的文件夹与文件
       const folders = new Set();
       const files = [];
 
       fileData.forEach(item => {
         const prefix = currentPath ? currentPath + '/' : '';
-        // 匹配前缀路径
         if (item.path.startsWith(prefix)) {
           const relativeToCurrent = item.path.substring(prefix.length);
           const subParts = relativeToCurrent.split('/');
           
           if (subParts.length > 1) {
-            folders.add(subParts[0]); // 将顶层子目录提取出来放入 Set 去重
+            folders.add(subParts[0]); 
           } else {
-            files.push(item); // 直接在该目录下的文件
+            files.push(item);
           }
         }
       });
 
-      // 3. 渲染文件夹 DOM
       folders.forEach(folder => {
         const targetPath = currentPath ? currentPath + '/' + folder : folder;
         gallery.innerHTML += \`
@@ -187,7 +218,6 @@ const html = `<!DOCTYPE html>
         \`;
       });
 
-      // 4. 渲染文件 DOM
       files.forEach(file => {
         if (file.type === 'image') {
           gallery.innerHTML += \`
@@ -211,9 +241,7 @@ const html = `<!DOCTYPE html>
       });
     }
 
-    // 事件代理：统一监听所有的动态按钮和链接点击
     document.body.addEventListener('click', (e) => {
-      // 匹配复制按钮
       if (e.target.classList.contains('copy-btn')) {
         const btn = e.target;
         navigator.clipboard.writeText(btn.dataset.url).then(() => {
@@ -228,7 +256,6 @@ const html = `<!DOCTYPE html>
         return;
       }
 
-      // 匹配图片预览
       const previewLink = e.target.closest('.preview[data-full]');
       if (previewLink) {
         e.preventDefault();
@@ -237,19 +264,16 @@ const html = `<!DOCTYPE html>
       }
     });
 
-    // 关闭模态框
     modal.addEventListener('click', () => {
       modal.style.display = 'none';
       modalImg.src = '';
     });
 
-    // 监听前端路由变化
     window.addEventListener('hashchange', () => {
       const hashPath = decodeURIComponent(window.location.hash.substring(2));
       renderView(hashPath);
     });
 
-    // 页面首次加载渲染
     const initialPath = window.location.hash.length > 2 ? decodeURIComponent(window.location.hash.substring(2)) : '';
     renderView(initialPath);
   </script>
@@ -257,4 +281,4 @@ const html = `<!DOCTYPE html>
 </html>`;
 
 fs.writeFileSync(outputFile, html);
-console.log("✅ 已生成带文件夹层级分类的 index.html，不含 axios");
+console.log("✅ 构建完成：所有静态资源已隔离提取至 dist 目录，索引页生成完毕");
