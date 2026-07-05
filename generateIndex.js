@@ -23,6 +23,7 @@ const ignoreList = [
 const isImage = (filename) => /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(filename);
 const isVideo = (filename) => /\.(mp4|webm|mov)$/i.test(filename);
 
+// 提取数据数组存放容器
 let virtualFileSystem = [];
 
 // 1. 初始化构建目录 (每次构建前清空旧的 dist 目录)
@@ -170,6 +171,7 @@ const html = `<!DOCTYPE html>
   </div>
 
   <script>
+    // 注入后端生成的数据集
     const fileData = ${fileDataJson};
     
     const gallery = document.getElementById('gallery');
@@ -177,9 +179,11 @@ const html = `<!DOCTYPE html>
     const modal = document.getElementById('modal');
     const modalImg = document.getElementById('modal-img');
 
+    // 核心渲染函数：根据 Hash 路径生成 DOM
     function renderView(currentPath) {
       gallery.innerHTML = '';
       
+      // 1. 渲染面包屑导航
       const pathParts = currentPath.split('/').filter(Boolean);
       let breadcrumbHtml = '<a href="#/">🏠 根目录</a>';
       let cumulativePath = '';
@@ -189,23 +193,26 @@ const html = `<!DOCTYPE html>
       });
       breadcrumb.innerHTML = breadcrumbHtml;
 
+      // 2. 解析当前层级下的文件夹与文件
       const folders = new Set();
       const files = [];
 
       fileData.forEach(item => {
         const prefix = currentPath ? currentPath + '/' : '';
+        // 匹配前缀路径
         if (item.path.startsWith(prefix)) {
           const relativeToCurrent = item.path.substring(prefix.length);
           const subParts = relativeToCurrent.split('/');
           
           if (subParts.length > 1) {
-            folders.add(subParts[0]); 
+            folders.add(subParts[0]); // 将顶层子目录提取出来放入 Set 去重
           } else {
-            files.push(item);
+            files.push(item); // 直接在该目录下的文件
           }
         }
       });
 
+      // 3. 渲染文件夹 DOM
       folders.forEach(folder => {
         const targetPath = currentPath ? currentPath + '/' + folder : folder;
         gallery.innerHTML += \`
@@ -218,6 +225,7 @@ const html = `<!DOCTYPE html>
         \`;
       });
 
+      // 4. 渲染文件 DOM
       files.forEach(file => {
         if (file.type === 'image') {
           gallery.innerHTML += \`
@@ -241,7 +249,9 @@ const html = `<!DOCTYPE html>
       });
     }
 
+    // 事件代理：统一监听所有的动态按钮和链接点击
     document.body.addEventListener('click', (e) => {
+      // 匹配复制按钮
       if (e.target.classList.contains('copy-btn')) {
         const btn = e.target;
         navigator.clipboard.writeText(btn.dataset.url).then(() => {
@@ -256,6 +266,7 @@ const html = `<!DOCTYPE html>
         return;
       }
 
+      // 匹配图片预览
       const previewLink = e.target.closest('.preview[data-full]');
       if (previewLink) {
         e.preventDefault();
@@ -264,16 +275,19 @@ const html = `<!DOCTYPE html>
       }
     });
 
+    // 关闭模态框
     modal.addEventListener('click', () => {
       modal.style.display = 'none';
       modalImg.src = '';
     });
 
+    // 监听前端路由变化
     window.addEventListener('hashchange', () => {
       const hashPath = decodeURIComponent(window.location.hash.substring(2));
       renderView(hashPath);
     });
 
+    // 页面首次加载渲染
     const initialPath = window.location.hash.length > 2 ? decodeURIComponent(window.location.hash.substring(2)) : '';
     renderView(initialPath);
   </script>
