@@ -16,7 +16,9 @@ const ignoreList = [
   "index.html",
   ".gitignore",
   "edgeone.json",
-  "dist"
+  "dist", 
+  "esa.jsonc", 
+  "functions"
 ];
 
 const isImage = (filename) => /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(filename);
