@@ -1,9 +1,0 @@
-{
-  "name": "image-api-esa",
-  "buildCommand": "node generateIndex.js",
-  "installCommand": "",
-  "entry": "./functions/index.js",
-  "assets": {
-    "directory": "./dist"
-  }
-}
